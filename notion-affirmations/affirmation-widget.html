@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Affirmation Widget</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=DM+Sans:wght@400;500;600&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #F7F2EA;
+            --text: #3D342C;
+            --accent: #A9825A;
+            --soft: #E9DFD1;
+            --muted: #8C7B6B;
+            --display: 'Cormorant Garamond', Georgia, serif;
+            --body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: var(--body);
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .wrap {
+            width: 100%;
+            max-width: 560px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .wrap.align-left { align-items: flex-start; text-align: left; }
+        .wrap.align-center { align-items: center; text-align: center; }
+        .wrap.align-right { align-items: flex-end; text-align: right; }
+        .wrap.clickable { cursor: pointer; user-select: none; }
+
+        .eyebrow {
+            font-size: 11px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        .quote-mark {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: 54px;
+            line-height: 0.5;
+            height: 22px;
+            color: var(--accent);
+        }
+
+        .text {
+            font-family: var(--display);
+            font-style: italic;
+            font-weight: 500;
+            font-size: clamp(20px, 9vh, 30px);
+            line-height: 1.3;
+            max-width: 30ch;
+            transition: opacity .45s ease, transform .45s ease;
+        }
+        .text.fade { opacity: 0; transform: translateY(4px); }
+
+        .dots { display: flex; gap: 6px; margin-top: 4px; }
+        .dots span {
+            width: 5px; height: 5px; border-radius: 50%;
+            background: var(--soft);
+            transition: background .3s;
+        }
+        .dots span.on { background: var(--accent); }
+
+        .layout-card .wrap,
+        body.layout-card .wrap {
+            background: var(--soft);
+            border-radius: 18px;
+            padding: 28px 28px 24px;
+        }
+        body.layout-card .dots span { background: var(--bg); }
+        body.layout-card .dots span.on { background: var(--accent); }
+
+        body.font-sans { --display: 'DM Sans', -apple-system, sans-serif; }
+        body.font-sans .text { font-style: normal; font-weight: 500; letter-spacing: -0.01em; font-size: clamp(18px, 8vh, 24px); }
+        body.font-hand { --display: 'Caveat', 'Bradley Hand', cursive; }
+        body.font-hand .text { font-style: normal; font-weight: 600; font-size: clamp(24px, 11vh, 36px); line-height: 1.15; }
+    </style>
+</head>
+<body>
+    <div class="wrap" id="wrap">
+        <div class="eyebrow" id="eyebrow" hidden></div>
+        <div class="quote-mark" id="quote-mark" hidden>&ldquo;</div>
+        <p class="text" id="text"></p>
+        <div class="dots" id="dots" hidden></div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+
+        function color(key, fallback) {
+            const v = (params.get(key) || '').trim();
+            if (v === 'transparent') return v;
+            return /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) ? v : fallback;
+        }
+
+        let list = [];
+        try { list = JSON.parse(params.get('affirmations') || '[]'); } catch (e) { list = []; }
+        list = (Array.isArray(list) ? list : []).map(s => String(s).trim()).filter(Boolean).slice(0, 60);
+        if (!list.length) {
+            list = [
+                'I am building a life I don’t need a vacation from.',
+                'Small steps every day add up to a beautiful year.',
+                'I trust the timing of my life.',
+                'I am allowed to grow at my own pace.',
+                'This is my year to bloom.'
+            ];
+        }
+
+        const settings = {
+            title: params.has('title') ? params.get('title') : 'Today’s reminder',
+            mode: ['daily', 'refresh', 'timed'].includes(params.get('mode')) ? params.get('mode') : 'daily',
+            interval: Math.min(3600, Math.max(5, parseInt(params.get('interval'), 10) || 12)),
+            clickNext: params.get('clickNext') !== 'false',
+            showQuotes: params.get('showQuotes') !== 'false',
+            showDots: params.get('showDots') === 'true',
+            layout: params.get('layout') === 'card' ? 'card' : 'plain',
+            align: ['left', 'center', 'right'].includes(params.get('align')) ? params.get('align') : 'center',
+            font: ['serif', 'sans', 'hand'].includes(params.get('font')) ? params.get('font') : 'serif'
+        };
+
+        const root = document.documentElement.style;
+        root.setProperty('--bg', color('bgColor', '#F7F2EA'));
+        root.setProperty('--text', color('textColor', '#3D342C'));
+        root.setProperty('--accent', color('accentColor', '#A9825A'));
+        root.setProperty('--soft', color('softColor', '#E9DFD1'));
+        root.setProperty('--muted', color('mutedColor', '#8C7B6B'));
+        document.body.classList.add('font-' + settings.font, 'layout-' + settings.layout);
+
+        const wrap = document.getElementById('wrap');
+        const textEl = document.getElementById('text');
+        const dotsEl = document.getElementById('dots');
+        wrap.classList.add('align-' + settings.align);
+
+        if (settings.title) {
+            const eb = document.getElementById('eyebrow');
+            eb.textContent = settings.title;
+            eb.hidden = false;
+        }
+        if (settings.showQuotes) document.getElementById('quote-mark').hidden = false;
+
+        const dotLimit = 12; // more than this gets busy, so dots hide for long lists
+        if (settings.showDots && list.length > 1 && list.length <= dotLimit) {
+            dotsEl.hidden = false;
+            list.forEach(() => dotsEl.appendChild(document.createElement('span')));
+        }
+
+        function dayOfYear(d) {
+            const start = new Date(d.getFullYear(), 0, 0);
+            return Math.floor((d - start) / 86400000);
+        }
+
+        let index;
+        if (settings.mode === 'daily') {
+            // Same affirmation all day on every device; years offset so day 1 isn't always item 1
+            const now = new Date();
+            index = (dayOfYear(now) + now.getFullYear()) % list.length;
+        } else {
+            index = Math.floor(Math.random() * list.length);
+        }
+
+        function show(i, animate) {
+            index = (i + list.length) % list.length;
+            const apply = () => {
+                textEl.textContent = list[index];
+                [...dotsEl.children].forEach((d, n) => d.classList.toggle('on', n === index));
+                textEl.classList.remove('fade');
+            };
+            if (!animate) return apply();
+            textEl.classList.add('fade');
+            setTimeout(apply, 380);
+        }
+
+        show(index, false);
+
+        let timer = null;
+        function startTimer() {
+            if (settings.mode !== 'timed') return;
+            clearInterval(timer);
+            timer = setInterval(() => show(index + 1, true), settings.interval * 1000);
+        }
+        startTimer();
+
+        if (settings.clickNext && list.length > 1) {
+            wrap.classList.add('clickable');
+            wrap.title = 'Tap for another';
+            wrap.addEventListener('click', () => { show(index + 1, true); startTimer(); });
+        }
+    </script>
+</body>
+</html>
